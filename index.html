@@ -1,0 +1,2468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0d11" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="description" content="StickStudio — pose stick figures, build frames, export GIF, PNG or video. Runs offline on your phone." />
+<title>StickStudio — stick animation studio</title>
+<style>
+:root {
+  --bg: #0a0c10;
+  --surface: #12151b;
+  --surface-2: #1a1e26;
+  --surface-3: #232935;
+  --line: #2a3040;
+  --ink: #eef2f7;
+  --muted: #8b95a6;
+  --accent: #ff7a45;
+  --accent-ink: #1a0d06;
+  --good: #3ecf8e;
+  --danger: #ff5c5c;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --appbar: 58px;
+  --nav: 62px;
+  --panel: 118px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+button, input, select { font: inherit; color: inherit; border: none; background: none; }
+
+/* ---------------- shell ---------------- */
+.app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ---------------- app bar ---------------- */
+.appbar {
+  flex: 0 0 auto;
+  height: var(--appbar);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  z-index: 8;
+}
+.appbar .titles { flex: 1; min-width: 0; }
+.appbar .titles b {
+  display: block;
+  font-size: 17px;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
+.appbar .titles span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: -1px;
+}
+.ab-btn {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+  position: relative;
+  overflow: hidden;
+  transition: background .15s, transform .08s;
+}
+.ab-btn:active { transform: scale(.92); background: var(--surface-3); }
+.ab-btn svg { width: 21px; height: 21px; fill: currentColor; }
+.ab-btn.accent { background: var(--accent); color: var(--accent-ink); }
+.ab-btn.accent:active { background: var(--accent); }
+
+/* ---------------- stage ---------------- */
+.stage-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #06070a;
+}
+#stage { width: 100%; height: 100%; display: block; touch-action: none; }
+
+.zoom-cluster {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 4;
+}
+.zoom-cluster button {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: rgba(18, 21, 27, .86);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+  display: grid; place-items: center;
+  font-size: 17px;
+  color: var(--ink);
+}
+.zoom-cluster button:active { background: var(--surface-3); }
+
+.fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 56px; height: 56px;
+  border-radius: 19px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 22px rgba(255, 122, 69, .35);
+  z-index: 5;
+  transition: transform .1s;
+}
+.fab:active { transform: scale(.93); }
+.fab svg { width: 26px; height: 26px; fill: currentColor; }
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 40px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(18, 21, 27, .9);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity .4s;
+  z-index: 4;
+}
+.hint.hide { opacity: 0; }
+
+/* ---------------- bottom panel ---------------- */
+.panel {
+  flex: 0 0 auto;
+  height: var(--panel);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  display: none;
+  padding: 10px 12px;
+  gap: 10px;
+  align-items: center;
+}
+.panel::-webkit-scrollbar { display: none; }
+.panel.on { display: flex; }
+
+#panel-frames {
+  height: auto;
+  min-height: 128px;
+  max-height: 46vh;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  gap: 8px;
+  padding: 8px 10px 10px;
+}
+.transport { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
+.transport button:not(.chip) {
+  width: 40px; height: 36px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  display: grid; place-items: center;
+  font-size: 12px;
+}
+.transport button:active { background: var(--surface-3); }
+.transport .time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  letter-spacing: .02em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 11px;
+  margin-left: 2px;
+}
+.tl-top { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 0 0 auto; }
+.tl-top::-webkit-scrollbar { display: none; }
+.tl-top .chip { padding: 8px 12px; font-size: 12.5px; }
+
+.tl-body { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 4px; }
+.tl-row { display: flex; align-items: center; gap: 8px; }
+.tl-name {
+  flex: 0 0 84px;
+  font-size: 11.5px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tl-name.on { color: var(--accent); }
+.tl-name .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.tl-track { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.tl-track::-webkit-scrollbar { display: none; }
+.tl-cell {
+  flex: 0 0 auto;
+  width: 20px; height: 26px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  position: relative;
+}
+.tl-cell.has-key { background: var(--surface-3); border-color: rgba(255,255,255,.14); }
+.tl-cell.has-key::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 7px; height: 7px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+.tl-cell.now { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tl-cell.now.has-key::after { background: var(--accent); }
+
+.panel-col { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.chiprow { display: flex; gap: 8px; align-items: center; }
+
+.chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink);
+  transition: transform .08s, background .15s;
+}
+.chip:active { transform: scale(.96); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.chip.icon { padding: 10px 12px; }
+.chip svg { width: 17px; height: 17px; fill: currentColor; }
+.chip.ghost { background: transparent; color: var(--muted); }
+
+.panel-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+/* frame strip inside the panel */
+.strip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  height: 100%;
+}
+.frame-chip {
+  position: relative;
+  flex: 0 0 auto;
+  width: 62px; height: 62px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.frame-chip canvas { width: 100%; height: 100%; display: block; }
+.frame-chip .n {
+  position: absolute;
+  left: 5px; bottom: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  text-shadow: 0 1px 3px #000;
+  font-variant-numeric: tabular-nums;
+}
+.frame-chip.on { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent); }
+.frame-chip.on .n { color: var(--ink); }
+.add-frame {
+  flex: 0 0 auto;
+  width: 62px; height: 62px;
+  border-radius: 13px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 24px;
+}
+
+/* ---------------- bottom navigation ---------------- */
+.bottomnav {
+  flex: 0 0 auto;
+  height: var(--nav);
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  z-index: 9;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  position: relative;
+  transition: color .15s;
+}
+.nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+.nav-item.on { color: var(--accent); }
+.nav-item.on::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 26px; height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
+
+/* ---------------- sheets ---------------- */
+.veil {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, .58);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+  z-index: 20;
+}
+.veil.on { opacity: 1; pointer-events: auto; }
+
+.sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-height: 84vh;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-radius: 22px 22px 0 0;
+  transform: translateY(102%);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1);
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--safe-bottom);
+}
+.sheet.on { transform: translateY(0); }
+.sheet::before {
+  content: "";
+  width: 38px; height: 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  margin: 8px auto 0;
+}
+.sheet-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px 8px; }
+.sheet-head h2 { margin: 0; font-size: 16.5px; flex: 1; }
+.sheet-body { overflow-y: auto; padding: 0 16px 22px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(42, 48, 64, .7);
+}
+.row:last-child { border-bottom: none; }
+.row .label { flex: 1; font-size: 14px; }
+.row .sub { color: var(--muted); font-size: 12px; display: block; }
+
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; }
+.swatch.on { border-color: var(--ink); }
+
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 132px; height: 22px; background: transparent; }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: var(--surface-3); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px;
+  border-radius: 50%; background: var(--accent);
+}
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 4px; background: var(--surface-3); }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--accent); }
+
+.switch {
+  width: 46px; height: 27px; border-radius: 999px;
+  background: var(--surface-3); border: 1px solid var(--line);
+  position: relative; flex: 0 0 auto;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 21px; height: 21px; border-radius: 50%;
+  background: var(--muted);
+  transition: transform .18s, background .18s;
+}
+.switch.on { background: rgba(255, 122, 69, .22); border-color: var(--accent); }
+.switch.on::after { transform: translateX(19px); background: var(--accent); }
+
+.menu-list { display: flex; flex-direction: column; }
+.menu-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 2px;
+  border-bottom: 1px solid rgba(42, 48, 64, .7);
+  font-size: 14.5px;
+}
+.menu-item:last-child { border-bottom: none; }
+.menu-item:active { background: rgba(255, 255, 255, .03); }
+.menu-item .ico { width: 22px; display: grid; place-items: center; color: var(--muted); }
+.menu-item svg { width: 18px; height: 18px; fill: currentColor; }
+.menu-item .kbd { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+.fig-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2);
+  font-size: 13px;
+}
+.fig-chip.on { border-color: var(--accent); background: rgba(255, 122, 69, .14); }
+.fig-chip .sw { width: 12px; height: 12px; border-radius: 50%; }
+.fig-chip .x { color: var(--muted); font-size: 15px; line-height: 1; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav) + var(--panel) + 18px);
+  transform: translate(-50%, 10px);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  z-index: 40;
+  max-width: 86vw;
+  text-align: center;
+}
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+.progress {
+  position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 26px;
+  text-align: center;
+  z-index: 50;
+  display: none;
+  min-width: 200px;
+}
+.progress.on { display: block; }
+.progress .bar { height: 5px; border-radius: 3px; background: var(--surface-3); margin-top: 12px; overflow: hidden; }
+.progress .bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s; }
+.progress .pct { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* ---------------- wide screens ---------------- */
+@media (min-width: 860px) {
+  .app { max-width: 1180px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .sheet { left: 50%; right: auto; width: 540px; bottom: 20px; border-radius: 22px; transform: translate(-50%, 104%); }
+  .sheet.on { transform: translate(-50%, 0); }
+  .sheet::before { display: none; }
+  .panel { padding-left: 18px; padding-right: 18px; }
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="appbar">
+    <div class="titles">
+      <b>StickStudio</b>
+      <span id="frame-badge">1 / 1 frame</span>
+    </div>
+    <button class="ab-btn" id="tool-undo" aria-label="Undo">
+      <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 11-6 6H4a8 8 0 108-8z"/></svg>
+    </button>
+    <button class="ab-btn" id="tool-redo" aria-label="Redo">
+      <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7a6 6 0 106 6h2a8 8 0 11-8-8z"/></svg>
+    </button>
+    <button class="ab-btn accent" id="btn-play" aria-label="Play">
+      <svg viewBox="0 0 24 24" id="play-icon"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="ab-btn" id="btn-menu" aria-label="More">
+      <svg viewBox="0 0 24 24"><path d="M12 8a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z"/></svg>
+    </button>
+  </header>
+
+  <div class="stage-wrap" id="stage-wrap">
+    <canvas id="stage"></canvas>
+
+    <div class="zoom-cluster">
+      <button id="btn-zoom-in" aria-label="Zoom in">+</button>
+      <button id="btn-zoom-out" aria-label="Zoom out">−</button>
+      <button id="btn-fit" aria-label="Fit" style="font-size:14px">⤢</button>
+    </div>
+
+    <button class="fab" id="btn-add-frame" aria-label="Add frame">
+      <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>
+    </button>
+
+    <div class="hint" id="hint">Drag a joint to pose · two fingers to pan &amp; zoom</div>
+  </div>
+
+  <!-- animate / pose panel -->
+  <div class="panel on" id="panel-pose">
+    <div class="chiprow">
+      <button class="chip on" id="tool-pose">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 110 6 3 3 0 010-6zm-1 7h2l4 5-1.6 1.2L13 11.6V15l3 5h-2.2l-2.3-3.8L9 20H7l3-5v-3.4l-2.4 3.6L6 14l4-5z"/></svg>Pose
+      </button>
+      <button class="chip" id="tool-move">
+        <svg viewBox="0 0 24 24"><path d="M12 2l3 3h-2v5h5V8l3 3-3 3v-2h-5v5h2l-3 3-3-3h2v-5H6v2l-3-3 3-3v2h5V5H9l3-3z"/></svg>Move
+      </button>
+      <button class="chip" id="tool-onion">
+        <svg viewBox="0 0 24 24"><path d="M12 4c5 0 9 4.5 9 8s-4 8-9 8-9-4.5-9-8 4-8 9-8zm0 2.5A5.5 5.5 0 006.5 12 5.5 5.5 0 0012 17.5 5.5 5.5 0 0017.5 12 5.5 5.5 0 0012 6.5z"/></svg>Onion
+      </button>
+      <button class="chip" id="btn-flip">Flip</button>
+      <button class="chip" id="btn-copy-pose">Copy pose</button>
+      <button class="chip" id="btn-paste-pose">Paste</button>
+      <button class="chip ghost" id="btn-reset-pose">Reset</button>
+      <button class="chip" id="tool-add">
+        <svg viewBox="0 0 24 24"><path d="M11 4a3 3 0 110 6 3 3 0 010-6zM9 12h2l-1 4 2 4H9.5L8 16.5 6.5 20H5l2-4-1-4zm6-8h2v3h3v2h-3v3h-2v-3h-3V7h3V4z"/></svg>Figure
+      </button>
+    </div>
+  </div>
+
+  <!-- draw panel -->
+  <div class="panel" id="panel-draw">
+    <div class="chiprow">
+      <button class="chip on" id="tool-draw">
+        <svg viewBox="0 0 24 24"><path d="M3 17.3V21h3.7L17.6 10 14 6.4 3 17.3zM20.7 6.9a1 1 0 000-1.4l-2.2-2.2a1 1 0 00-1.4 0l-1.8 1.8 3.6 3.6 1.8-1.8z"/></svg>Brush
+      </button>
+      <button class="chip ghost" id="btn-clear-strokes">Clear frame</button>
+    </div>
+    <div class="panel-col">
+      <span class="panel-label">Size</span>
+      <input type="range" id="opt-brush" min="2" max="40" step="1">
+    </div>
+  </div>
+
+  <!-- frames panel -->
+  <div class="panel" id="panel-frames">
+    <div class="transport">
+      <button id="btn-prev" aria-label="Previous frame">◀◀</button>
+      <button id="btn-play-small" aria-label="Play">▶</button>
+      <button id="btn-next" aria-label="Next frame">▶▶</button>
+      <span class="time" id="time-display">00:00:01</span>
+      <button class="chip ghost" id="btn-loop">Loop</button>
+      <button class="chip ghost" id="btn-fps">12 fps</button>
+    </div>
+    <div class="tl-top">
+      <button class="chip" id="btn-add-key">+ Key</button>
+      <button class="chip ghost" id="btn-remove-key">Remove</button>
+      <button class="chip ghost" id="btn-shorter">Shorter</button>
+      <button class="chip ghost" id="btn-longer">Longer</button>
+      <button class="chip ghost" id="btn-copy-key">Copy</button>
+      <button class="chip ghost" id="btn-paste-key">Paste</button>
+      <button class="chip ghost" id="btn-easing">Easing</button>
+      <button class="chip ghost" id="btn-duplicate">Duplicate</button>
+      <button class="chip ghost" id="btn-delete">Delete</button>
+    </div>
+    <div class="tl-body" id="timeline"></div>
+  </div>
+
+  <!-- export panel -->
+  <div class="panel" id="panel-export">
+    <div class="chiprow">
+      <button class="chip" data-export="gif">GIF</button>
+      <button class="chip" data-export="png">PNG</button>
+      <button class="chip" data-export="video">Video</button>
+      <button class="chip" data-export="project">Project</button>
+      <select id="opt-size" style="background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.5px">
+        <option value="360">360 px</option>
+        <option value="480" selected>480 px</option>
+        <option value="600">600 px</option>
+        <option value="720">720 px</option>
+      </select>
+    </div>
+  </div>
+
+  <nav class="bottomnav">
+    <button class="nav-item on" data-tab="pose">
+      <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 110 6 3 3 0 010-6zm-1 7h2l4 5-1.6 1.2L13 11.6V15l3 5h-2.2l-2.3-3.8L9 20H7l3-5v-3.4l-2.4 3.6L6 14l4-5z"/></svg>
+      Animate
+    </button>
+    <button class="nav-item" data-tab="draw">
+      <svg viewBox="0 0 24 24"><path d="M3 17.3V21h3.7L17.6 10 14 6.4 3 17.3zM20.7 6.9a1 1 0 000-1.4l-2.2-2.2a1 1 0 00-1.4 0l-1.8 1.8 3.6 3.6 1.8-1.8z"/></svg>
+      Draw
+    </button>
+    <button class="nav-item" data-tab="frames">
+      <svg viewBox="0 0 24 24"><path d="M3 5h18v14H3V5zm2 2v10h4V7H5zm6 0v10h4V7h-4zm6 0v10h2V7h-2z"/></svg>
+      Frames
+    </button>
+    <button class="nav-item" data-tab="export">
+      <svg viewBox="0 0 24 24"><path d="M12 3l5 5h-3v6h-4V8H7l5-5zM5 18h14v3H5v-3z"/></svg>
+      Export
+    </button>
+  </nav>
+</div>
+
+<div class="veil" id="veil"></div>
+
+<section class="sheet" id="sheet-menu">
+  <div class="sheet-head">
+    <h2>Menu</h2>
+    <button class="ab-btn" data-close>✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="menu-list">
+      <div class="menu-item" data-action="new">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6V2zm8 1.5V8h4.5L14 3.5z"/></svg></span>
+        New animation <span class="kbd">clear all</span>
+      </div>
+      <div class="menu-item" data-action="save">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5V3zm3 2v5h7V5H8zm-1 9v6h10v-6H7z"/></svg></span>
+        Save project <span class="kbd">.json</span>
+      </div>
+      <div class="menu-item" data-action="open">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v12H3V6z"/></svg></span>
+        Open project <span class="kbd">.json</span>
+      </div>
+      <div class="menu-item" data-action="style">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18 2 2 0 001.6-3.2 2 2 0 011.6-3.2H18a3 3 0 003-3 9 9 0 00-9-8.6zM7.5 12A1.5 1.5 0 119 10.5 1.5 1.5 0 017.5 12zm3-4A1.5 1.5 0 1112 6.5 1.5 1.5 0 0110.5 8zm5 0A1.5 1.5 0 1117 6.5 1.5 1.5 0 0115.5 8z"/></svg></span>
+        Style &amp; figure
+      </div>
+      <div class="menu-item" data-action="help">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-3.5h-2V7h2v6.5z"/></svg></span>
+        How it works
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="sheet-style">
+  <div class="sheet-head">
+    <h2>Style &amp; figure</h2>
+    <button class="ab-btn" data-close>✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="row" style="display:block">
+      <span class="label">Layers <span class="sub">tap to select · 👁 visibility · ✕ remove</span></span>
+      <div id="layer-list" style="display:flex;flex-direction:column;gap:6px;margin-top:10px"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="chip" id="btn-add-layer">+ Figure layer</button>
+        <button class="chip" id="btn-add-ink">+ Ink layer</button>
+      </div>
+    </div>
+    <div class="row">
+      <span class="label">Line thickness</span>
+      <input type="range" id="opt-thickness" min="8" max="44" step="1">
+    </div>
+    <div class="row">
+      <span class="label">Head size</span>
+      <input type="range" id="opt-head" min="30" max="110" step="2">
+    </div>
+    <div class="row">
+      <span class="label">Figure colour</span>
+      <div class="swatches" id="opt-colors"></div>
+    </div>
+    <div class="row">
+      <span class="label">Show joints</span>
+      <div class="switch" id="opt-joints"></div>
+    </div>
+    <div class="row">
+      <span class="label">Onion skin</span>
+      <div class="switch" id="opt-onion"></div>
+    </div>
+    <div class="row">
+      <span class="label">Onion strength</span>
+      <input type="range" id="opt-onion-opacity" min="8" max="60" step="2">
+    </div>
+    <div class="row">
+      <span class="label">Grid</span>
+      <div class="switch" id="opt-grid"></div>
+    </div>
+    <div class="row">
+      <span class="label">Background</span>
+      <div class="swatches" id="opt-bg"></div>
+    </div>
+    <div class="row">
+      <span class="label">Playback speed</span>
+      <input type="range" id="opt-fps" min="4" max="30" step="1">
+    </div>
+  </div>
+</section>
+
+<section class="sheet" id="sheet-help">
+  <div class="sheet-head">
+    <h2>How it works</h2>
+    <button class="ab-btn" data-close>✕</button>
+  </div>
+  <div class="sheet-body" style="color:var(--muted);font-size:14px;line-height:1.7">
+    <p style="color:var(--ink);margin-top:0"><b>Animate.</b> Drag any joint — bones keep their length,
+    so limbs swing instead of stretching. Drag the chest to move a whole figure. Use <b>Flip</b> to
+    mirror a pose, <b>Copy/Paste</b> to carry one across frames.</p>
+    <p><b>Frames.</b> The bottom tab shows thumbnails. <b>+</b> copies the current pose into a new
+    frame, tap a thumbnail to switch, long-press for duplicate / move / delete.</p>
+    <p><b>Draw.</b> Freehand strokes on the current frame — props, effects, whatever the figure holds.</p>
+    <p><b>Onion skin</b> shows the previous frame faintly, which is how motion stays smooth.</p>
+    <p style="margin-bottom:0"><b>Export</b> gives an animated GIF, a PNG of the current frame, a
+    video, or a project file. Everything stays on your device.</p>
+  </div>
+</section>
+
+<section class="sheet" id="sheet-frame">
+  <div class="sheet-head">
+    <h2 id="frame-sheet-title">Frame</h2>
+    <button class="ab-btn" data-close>✕</button>
+  </div>
+  <div class="sheet-body">
+    <div class="menu-list">
+      <div class="menu-item" data-frame-action="duplicate">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M8 3h9l4 4v14H8V3zm2 2v14h9V8h-3V5h-6zM4 7v14h11v-2H6V7H4z"/></svg></span>
+        Duplicate frame
+      </div>
+      <div class="menu-item" data-frame-action="left">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6V6z"/></svg></span>
+        Move left
+      </div>
+      <div class="menu-item" data-frame-action="right">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M10 6l6 6-6 6V6z"/></svg></span>
+        Move right
+      </div>
+      <div class="menu-item" data-frame-action="delete">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"/></svg></span>
+        Delete frame
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+<div class="progress" id="progress">
+  <div id="progress-label">Exporting…</div>
+  <div class="bar"><span id="progress-bar"></span></div>
+  <div class="pct" id="progress-pct">0%</div>
+</div>
+
+<input type="file" id="file-input" accept="application/json,.json" style="display:none">
+
+<script>
+/* ==========================================================================
+   StickStudio — core
+   Document model: scene → layers → keyframes. Everything in a 1000x1000 space.
+   ========================================================================== */
+"use strict";
+
+var V = 1000;
+
+/* ---------- rig ----------------------------------------------------------- */
+/* 15 joints, no separate neck: the head circle sits on the torso. */
+var J = {
+  HEAD: 0, CHEST: 1, HIP: 2,
+  LSH: 3, LEL: 4, LHAND: 5,
+  RSH: 6, REL: 7, RHAND: 8,
+  LHP: 9, LKN: 10, LFT: 11,
+  RHP: 12, RKN: 13, RFT: 14
+};
+var JOINT_COUNT = 15;
+var PARENT = [1, -1, 1, 1, 3, 4, 1, 6, 7, 2, 9, 10, 2, 12, 13];
+var BONES = [
+  [1, 2],
+  [1, 3], [3, 4], [4, 5],
+  [1, 6], [6, 7], [7, 8],
+  [2, 9], [9, 10], [10, 11],
+  [2, 12], [12, 13], [13, 14]
+];
+var CHILDREN = (function () {
+  var map = [];
+  for (var i = 0; i < JOINT_COUNT; i++) map.push([]);
+  for (var j = 0; j < JOINT_COUNT; j++) if (PARENT[j] >= 0) map[PARENT[j]].push(j);
+  return map;
+})();
+
+function defaultPose() {
+  var p = new Array(JOINT_COUNT * 2);
+  var at = [
+    [500, 200], [500, 268], [500, 560],
+    [438, 288], [398, 420], [366, 548],
+    [562, 288], [602, 420], [634, 548],
+    [472, 572], [458, 730], [442, 900],
+    [528, 572], [542, 730], [558, 900]
+  ];
+  for (var i = 0; i < JOINT_COUNT; i++) { p[i * 2] = at[i][0]; p[i * 2 + 1] = at[i][1]; }
+  return p;
+}
+
+function shiftChain(pose, joint, dx, dy) {
+  pose[joint * 2] += dx;
+  pose[joint * 2 + 1] += dy;
+  var kids = CHILDREN[joint];
+  for (var i = 0; i < kids.length; i++) shiftChain(pose, kids[i], dx, dy);
+}
+
+/** Rotate a joint around its parent and take the whole limb along: bone lengths never change. */
+function dragJoint(pose, joint, x, y) {
+  var parent = PARENT[joint];
+  if (parent < 0) {
+    shiftChain(pose, joint, x - pose[joint * 2], y - pose[joint * 2 + 1]);
+    return;
+  }
+  var px = pose[parent * 2], py = pose[parent * 2 + 1];
+  var vx = x - px, vy = y - py;
+  var len = Math.hypot(vx, vy);
+  if (len < 0.001) return;
+  var bone = Math.hypot(pose[joint * 2] - px, pose[joint * 2 + 1] - py);
+  var nx = px + vx / len * bone;
+  var ny = py + vy / len * bone;
+  shiftChain(pose, joint, nx - pose[joint * 2], ny - pose[joint * 2 + 1]);
+}
+
+function moveFigure(pose, dx, dy) {
+  shiftChain(pose, J.CHEST, dx, dy);
+}
+
+function mirrorPose(pose) {
+  var out = pose.slice();
+  var cx = (pose[J.CHEST * 2] + pose[J.HIP * 2]) / 2;
+  for (var i = 0; i < JOINT_COUNT; i++) out[i * 2] = 2 * cx - pose[i * 2];
+  [[J.LSH, J.RSH], [J.LEL, J.REL], [J.LHAND, J.RHAND],
+   [J.LHP, J.RHP], [J.LKN, J.RKN], [J.LFT, J.RFT]].forEach(function (pair) {
+    var ax = out[pair[0] * 2], ay = out[pair[0] * 2 + 1];
+    out[pair[0] * 2] = out[pair[1] * 2]; out[pair[0] * 2 + 1] = out[pair[1] * 2 + 1];
+    out[pair[1] * 2] = ax; out[pair[1] * 2 + 1] = ay;
+  });
+  return out;
+}
+
+function jointNear(pose, x, y, radius) {
+  var best = -1, bestD = radius;
+  for (var i = 0; i < JOINT_COUNT; i++) {
+    var d = Math.hypot(pose[i * 2] - x, pose[i * 2 + 1] - y);
+    if (d <= bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+function pointNearBone(pose, x, y, radius) {
+  for (var b = 0; b < BONES.length; b++) {
+    var a = BONES[b][0], c = BONES[b][1];
+    if (distToSegment(x, y, pose[a * 2], pose[a * 2 + 1], pose[c * 2], pose[c * 2 + 1]) <= radius) return true;
+  }
+  return Math.hypot(pose[0] - x, pose[1] - y) <= radius + 60;
+}
+
+function distToSegment(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx * dx + dy * dy;
+  var t = len2 === 0 ? 0 : ((px - x1) * dx + (py - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/* ---------- palette ------------------------------------------------------- */
+var COLORS = ["#2196F3", "#111827", "#FF3B30", "#FFC107", "#00C853", "#7C4DFF", "#FF6D00", "#F2F5F8"];
+var BACKGROUNDS = ["#FFFFFF", "#F2F5F8", "#0F1115", "#161B22", "#101820", "#1B1B23"];
+
+function uid() { return "l" + Math.random().toString(36).slice(2, 9); }
+
+/* ---------- document model ------------------------------------------------ */
+
+function newFigureLayer(name) {
+  return {
+    id: uid(), name: name, type: "figure", visible: true,
+    color: COLORS[0], thickness: 34, head: 74,
+    keys: [{ frame: 0, pose: defaultPose() }]
+  };
+}
+
+function newBrushLayer(name) {
+  return {
+    id: uid(), name: name, type: "brush", visible: true,
+    color: "#111827", brush: 10,
+    keys: [{ frame: 0, strokes: [] }]
+  };
+}
+
+function newProject() {
+  var figure = newFigureLayer("Figure 1");
+  return {
+    v: 3,
+    fps: 12,
+    length: 1,                 /* how many frames the timeline covers */
+    current: 0,                /* playhead */
+    scene: { bg: BACKGROUNDS[0], grid: true },
+    layers: [figure],
+    selected: figure.id,
+    settings: { onion: true, onionOpacity: 0.28, joints: true, brush: 10, exportSize: 480, tool: "pose" }
+  };
+}
+
+var project = newProject();
+
+/* ---------- layer helpers ------------------------------------------------- */
+
+function layerById(id) {
+  for (var i = 0; i < project.layers.length; i++) if (project.layers[i].id === id) return project.layers[i];
+  return null;
+}
+function selectedLayer() {
+  var layer = layerById(project.selected);
+  if (layer && layer.visible) return layer;
+  for (var i = 0; i < project.layers.length; i++) {
+    if (project.layers[i].type === "figure") return project.layers[i];
+  }
+  return project.layers[0];
+}
+function figureLayers() {
+  return project.layers.filter(function (l) { return l.type === "figure"; });
+}
+function brushLayer(create) {
+  var layer = project.layers.filter(function (l) { return l.type === "brush"; })[0];
+  if (!layer && create) {
+    layer = newBrushLayer("Ink");
+    project.layers.push(layer);
+  }
+  return layer || null;
+}
+
+/** The key that is showing at a given frame: the last one at or before it. */
+function keyAt(layer, frame) {
+  var found = null;
+  for (var i = 0; i < layer.keys.length; i++) {
+    var key = layer.keys[i];
+    if (key.frame <= frame && (!found || key.frame >= found.frame)) found = key;
+  }
+  if (!found && layer.keys.length) {
+    found = layer.keys.slice().sort(function (a, b) { return a.frame - b.frame; })[0];
+  }
+  return found;
+}
+
+function keyIndexAt(layer, frame) {
+  for (var i = 0; i < layer.keys.length; i++) if (layer.keys[i].frame === frame) return i;
+  return -1;
+}
+
+function keyFactory(layer) {
+  return layer.type === "figure" ? { frame: 0, pose: defaultPose() } : { frame: 0, strokes: [] };
+}
+
+/** A key that is safe to edit in place (creates one at frame 0 when the layer is empty). */
+function editableKey(layer, frame) {
+  var key = keyAt(layer, frame);
+  if (!key) {
+    key = keyFactory(layer);
+    key.frame = Math.max(0, Math.min(frame, project.length - 1));
+    layer.keys.push(key);
+    sortKeys(layer);
+  }
+  return key;
+}
+
+function sortKeys(layer) {
+  layer.keys.sort(function (a, b) { return a.frame - b.frame; });
+}
+
+function addKey(layer, frame, copyFromFrame) {
+  var existing = keyIndexAt(layer, frame);
+  if (existing >= 0) return layer.keys[existing];
+  var source = keyAt(layer, copyFromFrame === undefined ? frame : copyFromFrame);
+  var key = keyFactory(layer);
+  key.frame = frame;
+  if (layer.type === "figure") key.pose = source && source.pose ? source.pose.slice() : defaultPose();
+  else key.strokes = source && source.strokes ? JSON.parse(JSON.stringify(source.strokes)) : [];
+  layer.keys.push(key);
+  sortKeys(layer);
+  return key;
+}
+
+function removeKey(layer, frame) {
+  var index = keyIndexAt(layer, frame);
+  if (index < 0) return false;
+  if (layer.keys.length === 1) return false;   /* keep one so the layer stays usable */
+  layer.keys.splice(index, 1);
+  return true;
+}
+
+/** Pose of a figure layer at a frame (a copy). */
+function evalPose(layer, frame) {
+  var key = keyAt(layer, frame);
+  return key && key.pose ? key.pose.slice() : defaultPose();
+}
+
+function evalStrokes(layer, frame) {
+  var key = keyAt(layer, frame);
+  return (key && key.strokes) ? key.strokes : [];
+}
+
+function activePose(layer) {
+  return editableKey(layer, project.current).pose;
+}
+
+/* ---------- frame operations --------------------------------------------- */
+
+function insertFrame() {
+  var at = project.current + 1;
+  project.layers.forEach(function (layer) {
+    layer.keys.forEach(function (key) { if (key.frame >= at) key.frame++; });
+    if (layer.type === "figure") {
+      var source = keyAt(layer, project.current);
+      if (source) {
+        layer.keys.push({ frame: at, pose: source.pose.slice() });
+        sortKeys(layer);
+      }
+    }
+  });
+  project.length++;
+  project.current = at;
+}
+
+function deleteFrame() {
+  if (project.length <= 1) return false;
+  var at = project.current;
+  project.layers.forEach(function (layer) {
+    layer.keys = layer.keys.filter(function (key) { return key.frame !== at; });
+    layer.keys.forEach(function (key) { if (key.frame > at) key.frame--; });
+    if (!layer.keys.length) layer.keys.push(keyFactory(layer));
+    sortKeys(layer);
+  });
+  project.length--;
+  project.current = Math.max(0, Math.min(project.current, project.length - 1));
+  return true;
+}
+
+function duplicateFrame() {
+  insertFrame();
+  project.layers.forEach(function (layer) {
+    var source = keyAt(layer, project.current - 1);
+    var target = keyAt(layer, project.current);
+    if (source && target) {
+      if (layer.type === "figure") target.pose = source.pose.slice();
+      else target.strokes = JSON.parse(JSON.stringify(source.strokes));
+    }
+  });
+}
+
+/* ---------- layer operations --------------------------------------------- */
+
+function addFigureLayer() {
+  var layer = newFigureLayer("Figure " + (figureLayers().length + 1));
+  layer.color = COLORS[project.layers.length % COLORS.length];
+  var offset = figureLayers().length * 130 - 60;
+  layer.keys[0].pose = defaultPose();
+  moveFigure(layer.keys[0].pose, offset, 0);
+  project.layers.push(layer);
+  project.selected = layer.id;
+  return layer;
+}
+
+function deleteLayer(id) {
+  var layer = layerById(id);
+  if (!layer) return false;
+  if (layer.type === "figure" && figureLayers().length <= 1) return false;
+  project.layers = project.layers.filter(function (l) { return l.id !== id; });
+  if (project.selected === id) project.selected = selectedLayer().id;
+  return true;
+}
+
+function moveLayer(id, dir) {
+  var index = project.layers.findIndex(function (l) { return l.id === id; });
+  var to = index + dir;
+  if (index < 0 || to < 0 || to >= project.layers.length) return false;
+  var moved = project.layers.splice(index, 1)[0];
+  project.layers.splice(to, 0, moved);
+  return true;
+}
+
+/* ---------- history ------------------------------------------------------- */
+var HISTORY_LIMIT = 40;
+var undoStack = [];
+var redoStack = [];
+
+function snapshot() { return JSON.stringify(project); }
+
+function pushHistory() {
+  undoStack.push(snapshot());
+  while (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function undo() {
+  if (!undoStack.length) return false;
+  redoStack.push(snapshot());
+  restore(undoStack.pop());
+  return true;
+}
+
+function redo() {
+  if (!redoStack.length) return false;
+  undoStack.push(snapshot());
+  restore(redoStack.pop());
+  return true;
+}
+
+function restore(json) {
+  project = JSON.parse(json);
+  if (typeof afterRestore === "function") afterRestore();
+}
+
+/* ---------- storage ------------------------------------------------------- */
+var STORAGE_KEY = "stickstudio.project.v3";
+var storageOk = (function () {
+  try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); return true; } catch (e) { return false; }
+})();
+
+function saveLocal() {
+  if (!storageOk) return;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch (e) { /* quota */ }
+}
+
+function loadLocal() {
+  if (!storageOk) return false;
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("stickstudio.project.v2");
+    if (!raw) return false;
+    var data = JSON.parse(raw);
+    if (!data) return false;
+    project = normalize(data);
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---------- migration / import ------------------------------------------- */
+
+function migratePose(pose) {
+  if (!pose || !pose.length) return defaultPose();
+  if (pose.length === JOINT_COUNT * 2) return pose.slice();
+  if (pose.length === 32) {                      /* v1: had a separate neck joint */
+    var out = [];
+    for (var i = 0; i < JOINT_COUNT; i++) {
+      var old = i === 0 ? 0 : i + 1;
+      out.push(pose[old * 2], pose[old * 2 + 1]);
+    }
+    return out;
+  }
+  return defaultPose();
+}
+
+/** Accepts v3 documents, and upgrades v1/v2 (frame-per-pose) documents into layers. */
+function normalize(data) {
+  if (data && data.v === 3 && data.layers) {
+    var out = Object.assign(newProject(), data);
+    out.scene = Object.assign({ bg: BACKGROUNDS[0], grid: true }, data.scene || {});
+    out.settings = Object.assign(newProject().settings, data.settings || {});
+    out.layers = data.layers.map(function (layer) {
+      var base = layer.type === "brush" ? newBrushLayer(layer.name || "Ink") : newFigureLayer(layer.name || "Figure");
+      var merged = Object.assign(base, layer);
+      merged.keys = (layer.keys || []).map(function (key) {
+        var copy = Object.assign({}, key);
+        if (merged.type === "figure") copy.pose = migratePose(key.pose);
+        else copy.strokes = key.strokes || [];
+        return copy;
+      });
+      if (!merged.keys.length) merged.keys = base.keys;
+      sortKeys(merged);
+      return merged;
+    });
+    if (!out.layers.length) out.layers = [newFigureLayer("Figure 1")];
+    out.length = Math.max(1, data.length || 1);
+    out.current = Math.max(0, Math.min(data.current || 0, out.length - 1));
+    if (!layerById(out.selected)) out.selected = out.layers[0].id;
+    return out;
+  }
+
+  /* v1 / v2: frames[] each holding every figure's pose + strokes */
+  var upgraded = newProject();
+  upgraded.fps = data.fps || 12;
+  upgraded.scene = Object.assign(upgraded.scene, data.stage || data.scene || {});
+  upgraded.settings = Object.assign(upgraded.settings, data.settings || {});
+  upgraded.length = Math.max(1, (data.frames || []).length);
+  upgraded.current = Math.max(0, Math.min(data.current || 0, upgraded.length - 1));
+  upgraded.layers = [];
+
+  var oldFigures = data.figures || [];
+  oldFigures.forEach(function (fig, index) {
+    var layer = newFigureLayer(fig.name || "Figure " + (index + 1));
+    layer.color = fig.color || COLORS[index % COLORS.length];
+    layer.thickness = fig.thickness || 22;
+    layer.head = fig.head || 66;
+    layer.keys = (data.frames || []).map(function (f, frame) {
+      return { frame: frame, pose: migratePose(f.poses ? f.poses[fig.id] : null) };
+    });
+    if (!layer.keys.length) layer.keys = [{ frame: 0, pose: defaultPose() }];
+    upgraded.layers.push(layer);
+  });
+  if (!upgraded.layers.length) upgraded.layers = [newFigureLayer("Figure 1")];
+
+  var inkKeys = [];
+  (data.frames || []).forEach(function (f, frame) {
+    if (f.strokes && f.strokes.length) inkKeys.push({ frame: frame, strokes: f.strokes });
+  });
+  if (inkKeys.length) {
+    var ink = newBrushLayer("Ink");
+    ink.keys = inkKeys;
+    upgraded.layers.push(ink);
+  }
+  upgraded.selected = upgraded.layers[0].id;
+  return upgraded;
+}
+
+/* ---------- misc ---------------------------------------------------------- */
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function qs(sel, root) { return (root || document).querySelector(sel); }
+function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+
+</script>
+<script>
+/* ==========================================================================
+   StickStudio — stage: painting and touch/mouse input
+   ========================================================================== */
+"use strict";
+
+var canvas, ctx, dpr = 1;
+var view = { scale: 1, tx: 0, ty: 0, fitted: false };
+var pointers = new Map();
+var gesture = null;
+var hoverJoint = -1;
+var activeJoint = -1;
+var playing = false;
+var playIndex = 0;
+var playTimer = null;
+
+function shownFrame() { return playing ? playIndex : project.current; }
+
+/* ---------- painting ----------------------------------------------------- */
+
+function paintFrame(target, frameIndex, tf, opts) {
+  var o = opts || {};
+  var onion = !!o.onion;
+  var showJoints = o.joints !== false && !onion;
+
+  target.save();
+  target.lineCap = "round";
+  target.lineJoin = "round";
+
+  project.layers.forEach(function (layer) {
+    if (!layer.visible) return;
+
+    if (layer.type === "brush") {
+      var strokes = evalStrokes(layer, frameIndex);
+      strokes.forEach(function (stroke) {
+        if (!stroke.pts || stroke.pts.length < 4) return;
+        target.strokeStyle = onion ? "rgba(150,160,180,0.45)" : stroke.color;
+        target.lineWidth = stroke.w;
+        target.beginPath();
+        target.moveTo(stroke.pts[0], stroke.pts[1]);
+        for (var k = 2; k < stroke.pts.length; k += 2) target.lineTo(stroke.pts[k], stroke.pts[k + 1]);
+        target.stroke();
+      });
+      return;
+    }
+
+    var pose = evalPose(layer, frameIndex);
+    var color = onion ? "rgba(140,150,170,0.8)" : layer.color;
+
+    /* limbs: thick capsules, the way a finished stick figure is drawn */
+    target.strokeStyle = color;
+    target.fillStyle = color;
+    target.lineWidth = layer.thickness;
+    target.beginPath();
+    for (var b = 0; b < BONES.length; b++) {
+      var a = BONES[b][0], c = BONES[b][1];
+      target.moveTo(pose[a * 2], pose[a * 2 + 1]);
+      target.lineTo(pose[c * 2], pose[c * 2 + 1]);
+    }
+    target.stroke();
+
+    /* head: filled disc with a ring, so it reads on light and dark stages */
+    target.beginPath();
+    target.arc(pose[0], pose[1], layer.head, 0, Math.PI * 2);
+    target.fill();
+    if (!onion) {
+      target.beginPath();
+      target.arc(pose[0], pose[1], layer.head * 0.42, 0, Math.PI * 2);
+      target.fillStyle = "rgba(255,255,255,0.28)";
+      target.fill();
+      target.fillStyle = color;
+    }
+
+    if (showJoints && layer.id === project.selected) {
+      var unit = 1 / Math.max(0.0001, tf.scale || 1);
+      for (var j = 1; j < JOINT_COUNT; j++) {
+        target.beginPath();
+        target.arc(pose[j * 2], pose[j * 2 + 1], 6.5 * unit, 0, Math.PI * 2);
+        target.fillStyle = "#FF3B30";
+        target.fill();
+        target.lineWidth = 1.4 * unit;
+        target.strokeStyle = "rgba(255,255,255,0.85)";
+        target.stroke();
+      }
+    }
+  });
+
+  target.restore();
+}
+
+function render() {
+  if (!ctx) return;
+  var w = canvas.width / dpr, h = canvas.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#06070a";
+  ctx.fillRect(0, 0, w, h);
+
+  var tf = { scale: view.scale };
+
+  ctx.save();
+  ctx.translate(view.tx, view.ty);
+  ctx.scale(view.scale, view.scale);
+
+  ctx.fillStyle = project.scene.bg;
+  ctx.fillRect(0, 0, V, V);
+  var lightStage = (function () {
+    var hex = (project.scene.bg || "#ffffff").replace("#", "");
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    var r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 150;
+  })();
+  if (project.scene.grid) {
+    ctx.strokeStyle = lightStage ? "rgba(15,23,42,0.09)" : "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1 / view.scale;
+    for (var i = 1; i < 10; i++) {
+      ctx.beginPath(); ctx.moveTo(i * 100, 0); ctx.lineTo(i * 100, V); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * 100); ctx.lineTo(V, i * 100); ctx.stroke();
+    }
+  }
+  ctx.strokeStyle = lightStage ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2 / view.scale;
+  ctx.strokeRect(0, 0, V, V);
+
+  var frameNow = shownFrame();
+  var previous = frameNow - 1;
+
+  if (project.settings.onion && !playing && previous >= 0) {
+    ctx.save();
+    ctx.globalAlpha = project.settings.onionOpacity;
+    paintFrame(ctx, previous, tf, { onion: true, joints: false });
+    ctx.restore();
+  }
+
+  paintFrame(ctx, frameNow, tf, { joints: project.settings.joints && !playing });
+
+  var focus = activeJoint >= 0 ? activeJoint : hoverJoint;
+  if (focus >= 0 && !playing) {
+    var layer = selectedLayer();
+    if (layer && layer.type === "figure") {
+      var pose = evalPose(layer, frameNow);
+      var jx = pose[focus * 2], jy = pose[focus * 2 + 1];
+      ctx.beginPath();
+      ctx.arc(jx, jy, 16 / view.scale, 0, Math.PI * 2);
+      ctx.fillStyle = "#FF7A45";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(jx, jy, 16 / view.scale, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,122,69,0.35)";
+      ctx.lineWidth = 9 / view.scale;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+/* ---------- view --------------------------------------------------------- */
+
+function fitView() {
+  var rect = canvas.getBoundingClientRect();
+  view.scale = Math.min(rect.width, rect.height) * 0.92 / V;
+  view.tx = (rect.width - V * view.scale) / 2;
+  view.ty = (rect.height - V * view.scale) / 2;
+  view.fitted = true;
+  render();
+}
+
+function zoomAt(clientX, clientY, factor) {
+  var rect = canvas.getBoundingClientRect();
+  var cx = clientX - rect.left, cy = clientY - rect.top;
+  var next = clamp(view.scale * factor, 0.08, 6);
+  var k = next / view.scale;
+  view.tx = cx - (cx - view.tx) * k;
+  view.ty = cy - (cy - view.ty) * k;
+  view.scale = next;
+  render();
+}
+
+function toVirtual(clientX, clientY) {
+  var rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left - view.tx) / view.scale,
+    y: (clientY - rect.top - view.ty) / view.scale
+  };
+}
+
+/* ---------- input -------------------------------------------------------- */
+
+function hitTest(vx, vy) {
+  var frameNow = shownFrame();
+  var radius = 46 / view.scale;
+  var order = [];
+  var selected = selectedLayer();
+  if (selected && selected.type === "figure") order.push(selected);
+  figureLayers().forEach(function (layer) { if (order.indexOf(layer) < 0) order.push(layer); });
+
+  for (var i = 0; i < order.length; i++) {
+    var layer = order[i];
+    if (!layer.visible) continue;
+    var pose = evalPose(layer, frameNow);
+    var joint = jointNear(pose, vx, vy, radius);
+    if (joint >= 0) return { layerId: layer.id, joint: joint };
+  }
+  for (var k = 0; k < order.length; k++) {
+    var l = order[k];
+    if (!l.visible) continue;
+    if (pointNearBone(evalPose(l, frameNow), vx, vy, radius)) return { layerId: l.id, joint: -1 };
+  }
+  return null;
+}
+
+function beginPose(clientX, clientY) {
+  var p = toVirtual(clientX, clientY);
+  var tool = project.settings.tool;
+
+  if (tool === "draw") {
+    var ink = brushLayer(true);
+    if (!ink) return;
+    pushHistory();
+    var key = editableKey(ink, project.current);
+    key.strokes = key.strokes || [];
+    var stroke = { pts: [p.x, p.y], w: project.settings.brush / view.scale, color: ink.color };
+    key.strokes.push(stroke);
+    gesture = { type: "draw", stroke: stroke };
+    return;
+  }
+
+  var hit = hitTest(p.x, p.y);
+  if (!hit) { gesture = { type: "pan", startX: clientX, startY: clientY, tx: view.tx, ty: view.ty }; return; }
+
+  project.selected = hit.layerId;
+  var layer = layerById(hit.layerId);
+
+  if (tool === "move" || hit.joint < 0) {
+    pushHistory();
+    gesture = { type: "moveFigure", layerId: layer.id, last: p };
+    if (typeof syncPanels === "function") syncPanels();
+    render();
+    return;
+  }
+
+  pushHistory();
+  activeJoint = hit.joint;
+  gesture = { type: "joint", layerId: layer.id, joint: hit.joint };
+  dragJoint(activePose(layer), hit.joint, p.x, p.y);
+  if (typeof syncPanels === "function") syncPanels();
+  render();
+}
+
+function movePose(clientX, clientY) {
+  if (!gesture) return;
+  var p = toVirtual(clientX, clientY);
+  if (gesture.type === "joint") {
+    var layer = layerById(gesture.layerId);
+    if (layer) dragJoint(activePose(layer), gesture.joint, p.x, p.y);
+    render();
+  } else if (gesture.type === "moveFigure") {
+    var fig = layerById(gesture.layerId);
+    if (fig) moveFigure(activePose(fig), p.x - gesture.last.x, p.y - gesture.last.y);
+    gesture.last = p;
+    render();
+  } else if (gesture.type === "draw") {
+    gesture.stroke.pts.push(p.x, p.y);
+    render();
+  } else if (gesture.type === "pan") {
+    view.tx = gesture.tx + (clientX - gesture.startX);
+    view.ty = gesture.ty + (clientY - gesture.startY);
+    render();
+  }
+}
+
+function endGesture() {
+  if (!gesture) return;
+  var changed = gesture.type !== "pan";
+  gesture = null;
+  activeJoint = -1;
+  render();
+  if (changed && typeof afterEdit === "function") afterEdit();
+}
+
+function initStage() {
+  canvas = qs("#stage");
+  ctx = canvas.getContext("2d");
+
+  function resize() {
+    var rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    if (!view.fitted) fitView(); else render();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  canvas.addEventListener("pointerdown", function (e) {
+    if (playing) return;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 2) {
+      gesture = null;
+      var pts = Array.from(pointers.values());
+      gesture = {
+        type: "pinch",
+        startDist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        startScale: view.scale,
+        startMid: { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 },
+        startTx: view.tx,
+        startTy: view.ty
+      };
+      return;
+    }
+    if (pointers.size === 1) beginPose(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!pointers.has(e.pointerId)) {
+      if (e.pointerType === "mouse" && !playing) {
+        var v = toVirtual(e.clientX, e.clientY);
+        var hit = hitTest(v.x, v.y);
+        var next = hit && hit.joint >= 0 ? hit.joint : -1;
+        if (next !== hoverJoint) { hoverJoint = next; render(); }
+      }
+      return;
+    }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (gesture && gesture.type === "pinch" && pointers.size >= 2) {
+      var pts = Array.from(pointers.values());
+      var dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      var mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      var next2 = clamp(gesture.startScale * (dist / Math.max(1, gesture.startDist)), 0.08, 6);
+      var rect = canvas.getBoundingClientRect();
+      var cx = mid.x - rect.left, cy = mid.y - rect.top;
+      var k = next2 / gesture.startScale;
+      view.tx = cx - ((gesture.startMid.x - rect.left) - gesture.startTx) * k;
+      view.ty = cy - ((gesture.startMid.y - rect.top) - gesture.startTy) * k;
+      view.scale = next2;
+      render();
+      return;
+    }
+    movePose(e.clientX, e.clientY);
+  });
+
+  function release(e) {
+    pointers.delete(e.pointerId);
+    if (gesture && gesture.type === "pinch") {
+      if (pointers.size === 0) gesture = null;
+      return;
+    }
+    if (pointers.size === 0) endGesture();
+  }
+  canvas.addEventListener("pointerup", release);
+  canvas.addEventListener("pointercancel", release);
+
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
+
+  qs("#btn-zoom-in").addEventListener("click", function () {
+    var r = canvas.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.25);
+  });
+  qs("#btn-zoom-out").addEventListener("click", function () {
+    var r = canvas.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1 / 1.25);
+  });
+  qs("#btn-fit").addEventListener("click", fitView);
+}
+
+</script>
+<script>
+/* ==========================================================================
+   StickStudio — timeline, panels, tools, export, boot
+   ========================================================================== */
+"use strict";
+
+var saveTimer = null;
+var toastTimer = null;
+var poseClipboard = null;
+var keyClipboard = null;
+
+/* ---------- small helpers ------------------------------------------------- */
+
+function tap() {
+  try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) { /* no haptics */ }
+}
+
+function bind(selector, event, handler) {
+  var el = typeof selector === "string" ? qs(selector) : selector;
+  if (el) el.addEventListener(event, handler);
+  return el;
+}
+
+function toast(message, ms) {
+  var el = qs("#toast");
+  el.textContent = message;
+  el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.classList.remove("on"); }, ms || 2200);
+}
+
+function openSheet(id) {
+  qsa(".sheet").forEach(function (s) { s.classList.remove("on"); });
+  qs("#veil").classList.add("on");
+  var sheet = qs("#" + id);
+  if (sheet) sheet.classList.add("on");
+}
+
+function closeSheets() {
+  qsa(".sheet").forEach(function (s) { s.classList.remove("on"); });
+  qs("#veil").classList.remove("on");
+}
+
+function showProgress(label, percent) {
+  qs("#progress").classList.add("on");
+  qs("#progress-label").textContent = label;
+  qs("#progress-bar").style.width = percent + "%";
+  qs("#progress-pct").textContent = Math.round(percent) + "%";
+}
+
+function hideProgress() { qs("#progress").classList.remove("on"); }
+
+function download(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 4000);
+}
+
+function setTool(tool) {
+  project.settings.tool = tool;
+  ["pose", "draw", "move"].forEach(function (name) {
+    var chip = qs("#tool-" + name);
+    if (chip) chip.classList.toggle("on", name === tool);
+  });
+  var hint = qs("#hint");
+  if (hint) {
+    hint.textContent = tool === "draw"
+      ? "Draw on this frame — strokes live on the Ink layer"
+      : tool === "move" ? "Drag a figure to move it" : "Drag a joint to pose · two fingers to pan & zoom";
+    hint.classList.remove("hide");
+    clearTimeout(hint.timer);
+    hint.timer = setTimeout(function () { hint.classList.add("hide"); }, 4200);
+  }
+  render();
+}
+
+function selectTab(tab) {
+  qsa(".nav-item").forEach(function (n) { n.classList.toggle("on", n.dataset.tab === tab); });
+  qsa(".panel").forEach(function (p) { p.classList.toggle("on", p.id === "panel-" + tab); });
+  if (tab === "pose") setTool("pose");
+  if (tab === "draw") setTool("draw");
+  if (tab === "frames") renderTimeline();
+  tap();
+}
+
+/* ---------- timeline ------------------------------------------------------ */
+
+function timecode(frameIndex) {
+  var fps = Math.max(1, project.fps);
+  var totalFrames = frameIndex;
+  var seconds = Math.floor(totalFrames / fps);
+  var frames = totalFrames % fps;
+  var mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  var ss = String(seconds % 60).padStart(2, "0");
+  var ff = String(frames).padStart(2, "0");
+  return mm + ":" + ss + ":" + ff;
+}
+
+function frameBadge() {
+  var index = playing ? playIndex : project.current;
+  qs("#frame-badge").textContent = (index + 1) + " / " + project.length + " frames";
+  var time = qs("#time-display");
+  if (time) time.textContent = timecode(index);
+  var loop = qs("#btn-loop");
+  if (loop) loop.classList.toggle("on", project.settings.loop !== false);
+}
+
+function renderTimeline() {
+  var host = qs("#timeline");
+  if (!host) return;
+  host.innerHTML = "";
+
+  project.layers.slice().reverse().forEach(function (layer) {
+    var row = document.createElement("div");
+    row.className = "tl-row";
+
+    var name = document.createElement("div");
+    name.className = "tl-name" + (layer.id === project.selected ? " on" : "");
+    name.innerHTML = '<span class="dot" style="background:' + (layer.type === "figure" ? layer.color : layer.color) + '"></span>' +
+      (layer.visible ? "" : "◌ ") + layer.name;
+    name.addEventListener("click", function () {
+      project.selected = layer.id;
+      renderTimeline();
+      syncPanels();
+      render();
+    });
+    row.appendChild(name);
+
+    var track = document.createElement("div");
+    track.className = "tl-track";
+    for (var f = 0; f < project.length; f++) {
+      var cell = document.createElement("div");
+      var hasKey = keyIndexAt(layer, f) >= 0;
+      cell.className = "tl-cell" + (hasKey ? " has-key" : "") + (f === project.current ? " now" : "");
+      cell.dataset.frame = f;
+      (function (frame) {
+        cell.addEventListener("click", function () {
+          if (playing) stopPlayback();
+          project.current = frame;
+          renderTimeline();
+          frameBadge();
+          render();
+          afterEdit(true);
+        });
+      })(f);
+      track.appendChild(cell);
+    }
+    row.appendChild(track);
+    host.appendChild(row);
+  });
+
+  frameBadge();
+}
+
+/* ---------- playback ------------------------------------------------------ */
+
+function togglePlayback() {
+  if (playing) { stopPlayback(); return; }
+  if (project.length < 2) { toast("Add a frame first"); return; }
+  playing = true;
+  playIndex = project.current;
+  qs("#btn-play").classList.add("on");
+  qs("#play-icon").innerHTML = '<path d="M7 5h4v14H7V5zm6 0h4v14h-4V5z"/>';
+  playTimer = setInterval(function () {
+    var next = playIndex + 1;
+    if (next >= project.length) {
+      if (project.settings.loop === false) { stopPlayback(); return; }
+      next = 0;
+    }
+    playIndex = next;
+    frameBadge();
+    render();
+  }, 1000 / project.fps);
+  render();
+}
+
+function stopPlayback() {
+  playing = false;
+  clearInterval(playTimer);
+  playTimer = null;
+  qs("#btn-play").classList.remove("on");
+  qs("#play-icon").innerHTML = '<path d="M8 5v14l11-7z"/>';
+  project.current = Math.min(project.current, project.length - 1);
+  renderTimeline();
+  render();
+}
+
+/* ---------- edit hooks ---------------------------------------------------- */
+
+function afterEdit(skipTimeline) {
+  frameBadge();
+  if (!skipTimeline) renderTimeline();
+  render();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveLocal, 600);
+}
+
+function afterRestore() {
+  if (playing) stopPlayback();
+  renderTimeline();
+  syncPanels();
+  render();
+  saveLocal();
+}
+
+/* ---------- panels -------------------------------------------------------- */
+
+function swatches(container, colors, current, onPick) {
+  if (!container) return;
+  container.innerHTML = "";
+  colors.forEach(function (color) {
+    var b = document.createElement("button");
+    b.className = "swatch" + (color === current ? " on" : "");
+    b.style.background = color;
+    b.addEventListener("click", function () {
+      qsa(".swatch", container).forEach(function (s) { s.classList.remove("on"); });
+      b.classList.add("on");
+      onPick(color);
+    });
+    container.appendChild(b);
+  });
+}
+
+function setSwitch(el, on) { if (el) el.classList.toggle("on", !!on); }
+
+function syncPanels() {
+  var layer = selectedLayer();
+
+  var list = qs("#layer-list");
+  if (list) {
+    list.innerHTML = "";
+    project.layers.slice().reverse().forEach(function (l) {
+      var chip = document.createElement("div");
+      chip.className = "fig-chip" + (l.id === project.selected ? " on" : "");
+      chip.style.justifyContent = "space-between";
+      chip.innerHTML = '<span class="sw" style="background:' + l.color + '"></span>' +
+        l.name + (l.type === "brush" ? " · ink" : "");
+
+      var actions = document.createElement("span");
+      actions.style.display = "flex";
+      actions.style.gap = "10px";
+
+      var eye = document.createElement("span");
+      eye.className = "x";
+      eye.textContent = l.visible ? "👁" : "◌";
+      eye.addEventListener("click", function (event) {
+        event.stopPropagation();
+        l.visible = !l.visible;
+        syncPanels();
+        renderTimeline();
+        render();
+        saveLocal();
+      });
+      actions.appendChild(eye);
+
+      if (!(l.type === "figure" && figureLayers().length <= 1)) {
+        var x = document.createElement("span");
+        x.className = "x";
+        x.textContent = "✕";
+        x.addEventListener("click", function (event) {
+          event.stopPropagation();
+          pushHistory();
+          deleteLayer(l.id);
+          syncPanels();
+          renderTimeline();
+          afterEdit(true);
+        });
+        actions.appendChild(x);
+      }
+      chip.appendChild(actions);
+
+      chip.addEventListener("click", function () {
+        project.selected = l.id;
+        syncPanels();
+        renderTimeline();
+        render();
+      });
+      list.appendChild(chip);
+    });
+  }
+
+  if (layer && layer.type === "figure") {
+    qs("#opt-thickness").value = layer.thickness;
+    qs("#opt-head").value = layer.head;
+    swatches(qs("#opt-colors"), COLORS, layer.color, function (color) {
+      pushHistory();
+      selectedLayer().color = color;
+      afterEdit();
+    });
+  }
+  setSwitch(qs("#opt-joints"), project.settings.joints);
+  setSwitch(qs("#opt-onion"), project.settings.onion);
+  if (qs("#opt-onion-opacity")) qs("#opt-onion-opacity").value = Math.round(project.settings.onionOpacity * 100);
+  setSwitch(qs("#opt-grid"), project.scene.grid);
+  if (qs("#opt-fps")) qs("#opt-fps").value = project.fps;
+  if (qs("#opt-brush")) qs("#opt-brush").value = project.settings.brush;
+  if (qs("#opt-size")) qs("#opt-size").value = String(project.settings.exportSize);
+  if (qs("#btn-fps")) qs("#btn-fps").textContent = project.fps + " fps";
+  if (qs("#tool-onion")) qs("#tool-onion").classList.toggle("on", project.settings.onion);
+  swatches(qs("#opt-bg"), BACKGROUNDS, project.scene.bg, function (color) {
+    pushHistory();
+    project.scene.bg = color;
+    afterEdit(true);
+  });
+}
+
+function bindPanels() {
+  bind("#veil", "click", closeSheets);
+  qsa("[data-close]").forEach(function (b) { b.addEventListener("click", closeSheets); });
+  bind("#btn-menu", "click", function () { openSheet("sheet-menu"); });
+  bind("#btn-play", "click", togglePlayback);
+
+  qsa(".nav-item").forEach(function (item) {
+    item.addEventListener("click", function () { selectTab(item.dataset.tab); });
+  });
+
+  qsa("#sheet-menu .menu-item").forEach(function (item) {
+    item.addEventListener("click", function () {
+      var action = item.dataset.action;
+      closeSheets();
+      if (action === "new") newAnimation();
+      if (action === "save") exportProject();
+      if (action === "open") qs("#file-input").click();
+      if (action === "style") openSheet("sheet-style");
+      if (action === "help") openSheet("sheet-help");
+    });
+  });
+
+  /* tools */
+  bind("#tool-pose", "click", function () { selectTab("pose"); });
+  bind("#tool-draw", "click", function () { selectTab("draw"); });
+  bind("#tool-move", "click", function () { setTool("move"); tap(); });
+  bind("#btn-clear-strokes", "click", function () {
+    var ink = brushLayer(false);
+    if (!ink) { toast("No ink layer yet"); return; }
+    var key = keyAt(ink, project.current);
+    if (!key || !key.strokes || !key.strokes.length) { toast("This frame has no strokes"); return; }
+    pushHistory();
+    key.strokes = [];
+    afterEdit();
+    toast("Strokes cleared");
+  });
+
+  /* pose actions */
+  bind("#btn-flip", "click", function () {
+    var layer = selectedLayer();
+    if (!layer || layer.type !== "figure") { toast("Select a figure layer"); return; }
+    pushHistory();
+    var pose = activePose(layer);
+    var mirrored = mirrorPose(pose.slice());
+    for (var i = 0; i < mirrored.length; i++) pose[i] = mirrored[i];
+    afterEdit();
+    toast("Figure flipped");
+  });
+  bind("#btn-copy-pose", "click", function () {
+    var layer = selectedLayer();
+    if (!layer || layer.type !== "figure") { toast("Select a figure layer"); return; }
+    poseClipboard = evalPose(layer, project.current);
+    toast("Pose copied");
+  });
+  bind("#btn-paste-pose", "click", function () {
+    var layer = selectedLayer();
+    if (!layer || layer.type !== "figure") { toast("Select a figure layer"); return; }
+    if (!poseClipboard) { toast("Copy a pose first"); return; }
+    pushHistory();
+    var pose = activePose(layer);
+    for (var i = 0; i < poseClipboard.length; i++) pose[i] = poseClipboard[i];
+    afterEdit();
+    toast("Pose pasted");
+  });
+  bind("#btn-reset-pose", "click", function () {
+    var layer = selectedLayer();
+    if (!layer || layer.type !== "figure") { toast("Select a figure layer"); return; }
+    pushHistory();
+    var pose = activePose(layer);
+    var fresh = defaultPose();
+    for (var i = 0; i < fresh.length; i++) pose[i] = fresh[i];
+    afterEdit();
+    toast("Pose reset");
+  });
+
+  /* layers */
+  bind("#btn-add-layer", "click", function () {
+    pushHistory();
+    var layer = addFigureLayer();
+    syncPanels();
+    renderTimeline();
+    afterEdit(true);
+    toast(layer.name + " added");
+  });
+  bind("#btn-add-ink", "click", function () {
+    if (brushLayer(false)) { toast("Ink layer already exists"); return; }
+    pushHistory();
+    var ink = brushLayer(true);
+    project.selected = ink.id;
+    syncPanels();
+    renderTimeline();
+    afterEdit(true);
+    toast("Ink layer added");
+  });
+
+  /* timeline + frame operations */
+  bind("#btn-add-key", "click", function () {
+    var layer = selectedLayer();
+    if (!layer) return;
+    pushHistory();
+    addKey(layer, project.current);
+    afterEdit();
+    toast("Key at frame " + (project.current + 1));
+  });
+  bind("#btn-remove-key", "click", function () {
+    var layer = selectedLayer();
+    if (!layer) return;
+    if (keyIndexAt(layer, project.current) < 0) { toast("No key on this frame"); return; }
+    if (layer.keys.length <= 1) { toast("Keep at least one key"); return; }
+    pushHistory();
+    removeKey(layer, project.current);
+    afterEdit();
+  });
+  bind("#btn-add-frame", "click", function () {
+    tap();
+    pushHistory();
+    insertFrame();
+    afterEdit();
+  });
+  bind("#btn-duplicate", "click", function () {
+    pushHistory();
+    duplicateFrame();
+    afterEdit();
+  });
+  bind("#btn-delete", "click", function () {
+    if (project.length <= 1) { toast("Keep at least one frame"); return; }
+    pushHistory();
+    deleteFrame();
+    afterEdit();
+  });
+  bind("#btn-prev", "click", function () {
+    if (playing) stopPlayback();
+    project.current = Math.max(0, project.current - 1);
+    afterEdit();
+  });
+  bind("#btn-next", "click", function () {
+    if (playing) stopPlayback();
+    project.current = Math.min(project.length - 1, project.current + 1);
+    afterEdit();
+  });
+  bind("#btn-play-small", "click", function () { togglePlayback(); });
+  bind("#btn-loop", "click", function () {
+    project.settings.loop = project.settings.loop === false;
+    frameBadge();
+    saveLocal();
+    toast(project.settings.loop ? "Looping" : "Play once");
+  });
+  bind("#btn-shorter", "click", function () {
+    if (project.length <= 1) { toast("Keep at least one frame"); return; }
+    pushHistory();
+    deleteFrame();
+    afterEdit();
+    toast("Frame shortened");
+  });
+  bind("#btn-longer", "click", function () {
+    pushHistory();
+    insertFrame();
+    afterEdit();
+    toast("Frame extended");
+  });
+  bind("#btn-copy-key", "click", function () {
+    keyClipboard = project.layers.map(function (layer) {
+      var key = keyAt(layer, project.current);
+      return {
+        layerId: layer.id,
+        pose: key && key.pose ? key.pose.slice() : null,
+        strokes: key && key.strokes ? JSON.parse(JSON.stringify(key.strokes)) : null
+      };
+    });
+    toast("Key copied");
+  });
+  bind("#btn-paste-key", "click", function () {
+    if (!keyClipboard) { toast("Copy a key first"); return; }
+    pushHistory();
+    keyClipboard.forEach(function (entry) {
+      var layer = layerById(entry.layerId);
+      if (!layer) return;
+      var key = addKey(layer, project.current);
+      if (entry.pose && key.pose) key.pose = entry.pose.slice();
+      if (entry.strokes && layer.type === "brush") key.strokes = JSON.parse(JSON.stringify(entry.strokes));
+    });
+    afterEdit();
+    toast("Key pasted");
+  });
+  bind("#btn-easing", "click", function () {
+    toast("Easing comes with the next batch (M2)");
+  });
+  bind("#btn-fps", "click", function () {
+    project.fps = project.fps >= 30 ? 6 : project.fps + 6;
+    syncPanels();
+    if (playing) { stopPlayback(); togglePlayback(); }
+    afterEdit(true);
+  });
+
+  /* undo / redo / onion */
+  bind("#tool-undo", "click", function () { if (undo()) toast("Undo"); else toast("Nothing to undo"); });
+  bind("#tool-redo", "click", function () { if (redo()) toast("Redo"); else toast("Nothing to redo"); });
+  bind("#tool-onion", "click", function () {
+    project.settings.onion = !project.settings.onion;
+    setSwitch(qs("#opt-onion"), project.settings.onion);
+    qs("#tool-onion").classList.toggle("on", project.settings.onion);
+    afterEdit(true);
+  });
+
+  /* style controls */
+  bind("#opt-thickness", "input", function (e) {
+    var layer = selectedLayer();
+    if (layer && layer.type === "figure") { layer.thickness = Number(e.target.value); afterEdit(true); }
+  });
+  bind("#opt-head", "input", function (e) {
+    var layer = selectedLayer();
+    if (layer && layer.type === "figure") { layer.head = Number(e.target.value); afterEdit(true); }
+  });
+  bind("#opt-joints", "click", function () {
+    project.settings.joints = !project.settings.joints;
+    setSwitch(qs("#opt-joints"), project.settings.joints);
+    afterEdit(true);
+  });
+  bind("#opt-onion", "click", function () {
+    project.settings.onion = !project.settings.onion;
+    setSwitch(qs("#opt-onion"), project.settings.onion);
+    qs("#tool-onion").classList.toggle("on", project.settings.onion);
+    afterEdit(true);
+  });
+  bind("#opt-onion-opacity", "input", function (e) {
+    project.settings.onionOpacity = Number(e.target.value) / 100;
+    afterEdit(true);
+  });
+  bind("#opt-grid", "click", function () {
+    project.scene.grid = !project.scene.grid;
+    setSwitch(qs("#opt-grid"), project.scene.grid);
+    afterEdit(true);
+  });
+  bind("#opt-fps", "input", function (e) {
+    project.fps = Number(e.target.value);
+    if (qs("#btn-fps")) qs("#btn-fps").textContent = project.fps + " fps";
+    afterEdit(true);
+  });
+  bind("#opt-brush", "input", function (e) { project.settings.brush = Number(e.target.value); });
+  bind("#opt-size", "change", function (e) {
+    project.settings.exportSize = Number(e.target.value);
+    saveLocal();
+  });
+
+  /* export */
+  qsa("[data-export]").forEach(function (item) {
+    item.addEventListener("click", function () {
+      var kind = item.dataset.export;
+      closeSheets();
+      if (kind === "gif") exportGif();
+      if (kind === "png") exportPng();
+      if (kind === "video") exportVideo();
+      if (kind === "project") exportProject();
+    });
+  });
+
+  bind("#file-input", "change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        pushHistory();
+        project = normalize(JSON.parse(String(reader.result)));
+        afterRestore();
+        toast("Project opened");
+      } catch (error) {
+        toast("That file is not a StickStudio project");
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  /* keyboard */
+  window.addEventListener("keydown", function (e) {
+    var meta = e.ctrlKey || e.metaKey;
+    if (e.code === "Space") { e.preventDefault(); togglePlayback(); }
+    else if (e.key === "ArrowRight") { project.current = Math.min(project.length - 1, project.current + 1); afterEdit(); }
+    else if (e.key === "ArrowLeft") { project.current = Math.max(0, project.current - 1); afterEdit(); }
+    else if (meta && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); if (undo()) toast("Undo"); }
+    else if (meta && (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey))) { e.preventDefault(); if (redo()) toast("Redo"); }
+    else if (e.key.toLowerCase() === "k") { pushHistory(); addKey(selectedLayer(), project.current); afterEdit(); }
+    else if (e.key.toLowerCase() === "g") { project.scene.grid = !project.scene.grid; syncPanels(); afterEdit(true); }
+    else if (e.key.toLowerCase() === "o") { project.settings.onion = !project.settings.onion; syncPanels(); afterEdit(true); }
+  });
+}
+
+/* ---------- project actions ---------------------------------------------- */
+
+function newAnimation() {
+  if (!confirm("Start a new animation? Current work will be cleared.")) return;
+  pushHistory();
+  project = newProject();
+  view.fitted = false;
+  fitView();
+  syncPanels();
+  afterEdit();
+  toast("New animation");
+}
+
+function exportProject() {
+  var blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+  download(blob, "stickstudio-" + Date.now() + ".json");
+  toast("Project saved");
+}
+
+/* ---------- rendering for export ----------------------------------------- */
+
+function renderFrameToCanvas(frameIndex, size) {
+  var c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  var g = c.getContext("2d");
+  g.fillStyle = project.scene.bg;
+  g.fillRect(0, 0, size, size);
+  var scale = size * 0.94 / V;
+  var offset = (size - V * scale) / 2;
+  g.setTransform(scale, 0, 0, scale, offset, offset);
+  paintFrame(g, frameIndex, { scale: scale }, { joints: false });
+  return c;
+}
+
+function exportPng() {
+  var size = project.settings.exportSize;
+  var c = renderFrameToCanvas(project.current, size);
+  c.toBlob(function (blob) {
+    download(blob, "stickstudio-frame-" + (project.current + 1) + ".png");
+    toast("PNG saved · " + size + " px");
+  }, "image/png");
+}
+
+/* ---------- GIF encoder -------------------------------------------------- */
+
+var GIF_PALETTE = (function () {
+  var pal = new Uint8Array(768);
+  var step = 51, index = 0;
+  for (var r = 0; r < 6; r++) for (var g = 0; g < 6; g++) for (var b = 0; b < 6; b++) {
+    pal[index++] = r * step; pal[index++] = g * step; pal[index++] = b * step;
+  }
+  for (var i = 0; index < 768; i++) {
+    var grey = Math.round(i * 255 / 39);
+    pal[index++] = grey; pal[index++] = grey; pal[index++] = grey;
+  }
+  return pal;
+})();
+
+function quantize(r, g, b) {
+  var step = 51;
+  var rq = Math.min(5, Math.round(r / step)), gq = Math.min(5, Math.round(g / step)), bq = Math.min(5, Math.round(b / step));
+  var cube = rq * 36 + gq * 6 + bq;
+  var dr = r - rq * step, dg = g - gq * step, db = b - bq * step;
+  var cubeErr = dr * dr + dg * dg + db * db;
+  var greyValue = (r + g + b) / 3;
+  var greyIndex = Math.min(39, Math.round(greyValue * 39 / 255));
+  var level = Math.round(greyIndex * 255 / 39);
+  var e1 = r - level, e2 = g - level, e3 = b - level;
+  return (e1 * e1 + e2 * e2 + e3 * e3) < cubeErr ? 216 + greyIndex : cube;
+}
+
+function encodeGif(frames, width, height, delayCs, onProgress) {
+  var out = [];
+  function byte(v) { out.push(v & 255); }
+  function short(v) { byte(v); byte(v >> 8); }
+  function str(s) { for (var i = 0; i < s.length; i++) byte(s.charCodeAt(i)); }
+
+  str("GIF89a");
+  short(width); short(height);
+  byte(0xF7); byte(0); byte(0);
+  for (var p = 0; p < 768; p++) byte(GIF_PALETTE[p]);
+  byte(0x21); byte(0xFF); byte(0x0B); str("NETSCAPE2.0"); byte(0x03); byte(0x01); short(0); byte(0);
+
+  var block = [];
+  function flushBlock() {
+    if (!block.length) return;
+    byte(block.length);
+    for (var i = 0; i < block.length; i++) byte(block[i]);
+    block = [];
+  }
+
+  for (var f = 0; f < frames.length; f++) {
+    var data = frames[f];
+    byte(0x21); byte(0xF9); byte(0x04); byte(0x04);
+    short(Math.max(1, delayCs));
+    byte(0); byte(0);
+    byte(0x2C); short(0); short(0); short(width); short(height); byte(0);
+    byte(8);
+
+    var bitBuffer = 0, bitCount = 0, codeSize = 9, nextCode = 258;
+    var dict = new Map();
+
+    function emit(code) {
+      bitBuffer |= code << bitCount;
+      bitCount += codeSize;
+      while (bitCount >= 8) {
+        block.push(bitBuffer & 255);
+        if (block.length === 255) flushBlock();
+        bitBuffer >>= 8;
+        bitCount -= 8;
+      }
+    }
+
+    emit(256);
+    var prefix = data[0];
+    for (var i = 1; i < data.length; i++) {
+      var next = data[i];
+      var key = (prefix << 8) | next;
+      var found = dict.get(key);
+      if (found !== undefined) { prefix = found; continue; }
+      emit(prefix);
+      if (nextCode <= 4095) {
+        dict.set(key, nextCode++);
+        if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+      } else {
+        emit(256);
+        dict = new Map();
+        nextCode = 258;
+        codeSize = 9;
+      }
+      prefix = next;
+    }
+    emit(prefix);
+    emit(257);
+    if (bitCount > 0) {
+      block.push(bitBuffer & 255);
+      if (block.length === 255) flushBlock();
+    }
+    flushBlock();
+    byte(0);
+    if (onProgress) onProgress((f + 1) / frames.length);
+  }
+
+  byte(0x3B);
+  return new Uint8Array(out);
+}
+
+function exportGif() {
+  var size = project.settings.exportSize;
+  var delay = Math.max(2, Math.round(100 / project.fps));
+  showProgress("Rendering frames…", 0);
+
+  setTimeout(function () {
+    try {
+      var pixels = [];
+      for (var i = 0; i < project.length; i++) {
+        var c = renderFrameToCanvas(i, size);
+        var img = c.getContext("2d").getImageData(0, 0, size, size).data;
+        var indices = new Uint8Array(size * size);
+        for (var p = 0, q = 0; p < indices.length; p++, q += 4) {
+          indices[p] = quantize(img[q], img[q + 1], img[q + 2]);
+        }
+        pixels.push(indices);
+        showProgress("Rendering frames…", (i + 1) / project.length * 40);
+      }
+      var bytes = encodeGif(pixels, size, size, delay, function (ratio) {
+        showProgress("Encoding GIF…", 40 + ratio * 60);
+      });
+      download(new Blob([bytes], { type: "image/gif" }), "stickstudio-" + size + "px.gif");
+      hideProgress();
+      toast("GIF saved · " + project.length + " frames · " + size + " px");
+    } catch (error) {
+      hideProgress();
+      toast("GIF export failed: " + error.message);
+    }
+  }, 60);
+}
+
+/* ---------- video export ------------------------------------------------- */
+
+function pickVideoMime() {
+  var options = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  if (!window.MediaRecorder) return null;
+  for (var i = 0; i < options.length; i++) if (MediaRecorder.isTypeSupported(options[i])) return options[i];
+  return null;
+}
+
+function exportVideo() {
+  var mime = pickVideoMime();
+  if (!mime) { toast("This browser cannot record video — use GIF"); return; }
+
+  var size = project.settings.exportSize;
+  var source = document.createElement("canvas");
+  source.width = size; source.height = size;
+  var g = source.getContext("2d");
+  var stream = source.captureStream(project.fps);
+  var chunks = [];
+  var recorder;
+  try {
+    recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4000000 });
+  } catch (error) {
+    toast("Video recording is not available here");
+    return;
+  }
+  recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = function () {
+    var type = mime.indexOf("mp4") >= 0 ? "video/mp4" : "video/webm";
+    var ext = type === "video/mp4" ? "mp4" : "webm";
+    download(new Blob(chunks, { type: type }), "stickstudio." + ext);
+    hideProgress();
+    toast("Video saved · " + ext.toUpperCase());
+  };
+
+  showProgress("Recording…", 0);
+  recorder.start();
+  var total = project.length;
+  var index = 0;
+  var interval = 1000 / project.fps;
+
+  var timer = setInterval(function () {
+    g.drawImage(renderFrameToCanvas(index, size), 0, 0);
+    showProgress("Recording…", (index + 1) / total * 100);
+    index++;
+    if (index >= total) {
+      clearInterval(timer);
+      setTimeout(function () { recorder.stop(); }, interval + 120);
+    }
+  }, interval);
+}
+
+/* ---------- boot --------------------------------------------------------- */
+
+function boot() {
+  var restored = loadLocal();
+  initStage();
+  bindPanels();
+  syncPanels();
+  renderTimeline();
+  selectTab("pose");
+  render();
+  frameBadge();
+
+  if (restored) toast("Restored your last animation", 1800);
+  setTimeout(function () { qs("#hint").classList.add("hide"); }, 7000);
+
+  window.addEventListener("orientationchange", function () {
+    setTimeout(function () { view.fitted = false; fitView(); }, 250);
+  });
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+
+</script>
+</body>
+</html>
